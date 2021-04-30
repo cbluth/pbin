@@ -12,7 +12,9 @@ install the normal "go" way:
 go get github.com/cbluth/pbin/cmd/pbin
 ```
 or download a binary from the releases page:
-- "..."
+```
+https://github.com/cbluth/pbin/releases
+```
 
 Usage:
 ---
