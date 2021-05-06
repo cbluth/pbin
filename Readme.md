@@ -34,7 +34,6 @@ $ pbin $URL
 Upload Base64 Paste:
 ```
 $ cat cat-meme.gif | pbin -base64
-https://privatebin.net/?c3dad23d043b0675#EEwJs9g3jSMC9gMHk5Gt5ptVDYpLXzCJMhP4Ufu3C3bf
 ```
 
 Download Base64 Paste:
@@ -50,7 +49,6 @@ $ pbin $URL -base64 -o cat-meme.gif
 Upload Paste with Burn After Read Once:
 ```
 $ echo "anything" | pbin -burn
-https://privatebin.net/?c3dad23d043b0675#EEwJs9g3jSMC9gMHk5Gt5ptVDYpLXzCJMhP4Ufu3C3bf
 ```
 
 Download Paste to filepath:
@@ -61,11 +59,9 @@ $ pbin $URL -output cat-meme.gif
 Upload Paste with discussion forum enabled:
 ```
 $ echo "anything" | pbin -open
-https://privatebin.net/?c3dad23d043b0675#EEwJs9g3jSMC9gMHk5Gt5ptVDYpLXzCJMhP4Ufu3C3bf
 ```
 
 Upload Paste with password protection:
 ```
 $ echo "anything" | pbin -password mySecretPassw0rd
-https://privatebin.net/?c3dad23d043b0675#EEwJs9g3jSMC9gMHk5Gt5ptVDYpLXzCJMhP4Ufu3C3bf
 ```

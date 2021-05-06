@@ -112,7 +112,7 @@ func put() error {
 		return err
 	}
 	p.BurnAfterRead(burnAfterRead)
-	p.OpenDiscussion(burnAfterRead)
+	p.OpenDiscussion(openDiscussion)
 	if password != "" {
 		p.SetPassword(password)
 	}

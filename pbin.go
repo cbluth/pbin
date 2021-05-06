@@ -19,45 +19,40 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-var (
-	// OpenDiscussion   bool
-	// BurnAfterReading bool
-)
-
 const (
-	PrivateBinAPIVersion          int    = 2
-	KDFIterations          int    = 100000 // kdf iterations
-	KDFSecretSize       int    = 32     // bytes
-	AESKeySize          int    = 32     // bytes
-	NonceSize           int    = 12     // bytes
-	SaltSize            int    = 8      // bytes
-	TagSize             int    = 128    // bits??
-	EncryptionAlgorithm string = "aes"
-	EncryptionMode      string = "gcm"
-	DataCompression     string = "zlib"
+	PrivateBinAPIVersion int    = 2
+	KDFIterations        int    = 100000 // kdf iterations
+	KDFSecretSize        int    = 32     // bytes
+	AESKeySize           int    = 32     // bytes
+	NonceSize            int    = 12     // bytes
+	SaltSize             int    = 8      // bytes
+	TagSize              int    = 128    // bits??
+	EncryptionAlgorithm  string = "aes"
+	EncryptionMode       string = "gcm"
+	DataCompression      string = "zlib"
 
 	//
-	defaultFormat              string = formatSyntaxHighlighting
-	formatSyntaxHighlighting   string = "syntaxhighlighting"
-	defaultExpiry              string = expiryOneWeek
-	expiryOneWeek				string = "1week"
-	defaultOpenDiscussion      bool   = false
-	defaultBurnAfterReading    bool   = false
+	defaultFormat            string = formatSyntaxHighlighting
+	formatSyntaxHighlighting string = "syntaxhighlighting"
+	defaultExpiry            string = expiryOneWeek
+	expiryOneWeek            string = "1week"
+	defaultOpenDiscussion    bool   = false
+	defaultBurnAfterReading  bool   = false
 )
 
 type (
 	Paste struct {
-		clearTextData       []byte
-		cipherJSONData      []byte
-		kDFSecret           [KDFSecretSize]byte
-		aESKey              [AESKeySize]byte
-		salt                [SaltSize]byte
-		nonce               [NonceSize]byte // IV
-		expire              string
-		openDiscussion      bool
-		burnAfterReading    bool
-		displayFormat       string
-		userPassword		string
+		clearTextData    []byte
+		cipherJSONData   []byte
+		kDFSecret        [KDFSecretSize]byte
+		aESKey           [AESKeySize]byte
+		salt             [SaltSize]byte
+		nonce            [NonceSize]byte // IV
+		expire           string
+		openDiscussion   bool
+		burnAfterReading bool
+		displayFormat    string
+		userPassword     string
 	}
 )
 
@@ -68,7 +63,7 @@ func CraftPaste(b []byte) (*Paste, error) {
 }
 
 func (p *Paste) init(b []byte) *Paste {
-	if ( p == nil ) {
+	if p == nil {
 		p = &Paste{}
 	}
 	copy(p.salt[:], randomBytes(SaltSize))
@@ -164,7 +159,6 @@ func (p *Paste) encrypt() error {
 	} else {
 		copy(p.aESKey[:], makeAESKey(p.kDFSecret[:], p.salt[:]))
 	}
-	
 	c, err := aes.NewCipher(p.aESKey[:])
 	if err != nil {
 		return err

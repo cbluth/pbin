@@ -4,8 +4,8 @@ import (
 	mrand "math/rand"
 	"net"
 	"net/url"
-	"time"
 	"sync"
+	"time"
 )
 
 var (
@@ -127,7 +127,7 @@ func (h *host) ping() bool {
 func findFastest() host {
 	rh := pickRandom(5)
 	type result struct {
-		h host
+		h       host
 		elapsed time.Duration
 	}
 	fastestChan := make(chan host)
@@ -141,7 +141,7 @@ func findFastest() host {
 			}
 		}
 		fastestChan <- best.h
-	}(resultsChan, fastestChan)	
+	}(resultsChan, fastestChan)
 	wg := sync.WaitGroup{}
 	for _, hs := range rh {
 		wg.Add(1)
@@ -150,10 +150,10 @@ func findFastest() host {
 			start := time.Now()
 			if h.ping() {
 				out <- result{
-					h: h,
+					h:       h,
 					elapsed: start.Sub(time.Now()),
 				}
-			}			
+			}
 		}(hs, resultsChan)
 	}
 	wg.Wait()
