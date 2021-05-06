@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"time"
+	"sync"
 )
 
 var (
@@ -124,16 +125,38 @@ func (h *host) ping() bool {
 }
 
 func findFastest() host {
-	r := pickRandom(5)
-	ping := make(chan host)
-	go func(ch chan host) {
-		for _, hs := range r {
-			go func(c chan host, h host) {
-				if h.ping() {
-					c <- h
-				}
-			}(ch, hs)
+	rh := pickRandom(5)
+	type result struct {
+		h host
+		elapsed time.Duration
+	}
+	fastestChan := make(chan host)
+	resultsChan := make(chan result, 10)
+	// Routine gets the smallest value
+	go func(in <-chan result, out chan<- host) {
+		var best *result
+		for r := range in {
+			if best == nil || r.elapsed < best.elapsed {
+				best = &r
+			}
 		}
-	}(ping)
-	return <-ping
+		fastestChan <- best.h
+	}(resultsChan, fastestChan)	
+	wg := sync.WaitGroup{}
+	for _, hs := range rh {
+		wg.Add(1)
+		go func(h host, out chan<- result) {
+			defer wg.Done()
+			start := time.Now()
+			if h.ping() {
+				out <- result{
+					h: h,
+					elapsed: start.Sub(time.Now()),
+				}
+			}			
+		}(hs, resultsChan)
+	}
+	wg.Wait()
+	close(resultsChan)
+	return <-fastestChan
 }

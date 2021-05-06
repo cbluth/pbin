@@ -20,79 +20,95 @@ import (
 )
 
 var (
-	OpenDiscussion   bool
-	BurnAfterReading bool
+	// OpenDiscussion   bool
+	// BurnAfterReading bool
 )
 
 const (
-	APIVersion          int    = 2
-	Iterations          int    = 100000 // kdf iterations
+	PrivateBinAPIVersion          int    = 2
+	KDFIterations          int    = 100000 // kdf iterations
 	KDFSecretSize       int    = 32     // bytes
 	AESKeySize          int    = 32     // bytes
 	NonceSize           int    = 12     // bytes
 	SaltSize            int    = 8      // bytes
-	TagSize             int    = 128    // bits
+	TagSize             int    = 128    // bits??
 	EncryptionAlgorithm string = "aes"
 	EncryptionMode      string = "gcm"
 	DataCompression     string = "zlib"
-	Format              string = "syntaxhighlighting"
-	Expiry              string = "1week"
-	// OpenDiscussion      bool   = false
-	// BurnAfterReading    bool   = false
+
+	//
+	defaultFormat              string = formatSyntaxHighlighting
+	formatSyntaxHighlighting   string = "syntaxhighlighting"
+	defaultExpiry              string = expiryOneWeek
+	expiryOneWeek				string = "1week"
+	defaultOpenDiscussion      bool   = false
+	defaultBurnAfterReading    bool   = false
 )
 
 type (
 	Paste struct {
-		Version             int // 2
-		ClearTextData       []byte
-		ClearJSONData       []byte
-		CipherJSONData      []byte
-		RequestBodyJSONData []byte
-		KDFSecret           [KDFSecretSize]byte
-		AESKey              [AESKeySize]byte
-		Salt                [SaltSize]byte
-		Nonce               [NonceSize]byte // IV
-		Expire              string
-		OpenDiscussion      bool
-		BurnAfterReading    bool
-		DisplayFormat       string
+		clearTextData       []byte
+		cipherJSONData      []byte
+		kDFSecret           [KDFSecretSize]byte
+		aESKey              [AESKeySize]byte
+		salt                [SaltSize]byte
+		nonce               [NonceSize]byte // IV
+		expire              string
+		openDiscussion      bool
+		burnAfterReading    bool
+		displayFormat       string
+		userPassword		string
 	}
 )
 
-func CraftPaste(bytes []byte) (*Paste, error) {
-	p := &Paste{
-		Version:       APIVersion,
-		DisplayFormat: Format,
-		ClearTextData: bytes,
-	}
-	copy(p.Salt[:], randomBytes(SaltSize))
-	copy(p.Nonce[:], randomBytes(NonceSize)) // IV
-	copy(p.KDFSecret[:], randomBytes(KDFSecretSize))
-	p.Expire = Expiry
-	p.DisplayFormat = Format
-	p.OpenDiscussion = OpenDiscussion
-	p.BurnAfterReading = BurnAfterReading
-	err := p.encrypt()
-	if err != nil {
-		return nil, err
-	}
-	req := map[string]interface{}{}
-	req["v"] = APIVersion
-	req["adata"] = p.makeAData()
-	req["meta"] = map[string]interface{}{}
-	req["meta"].(map[string]interface{})["expire"] = Expiry
-	req["ct"] = base64.RawStdEncoding.EncodeToString(p.CipherJSONData)
-	p.RequestBodyJSONData, err = json.Marshal(&req)
-	if err != nil {
-		return nil, err
-	}
-
+func CraftPaste(b []byte) (*Paste, error) {
+	p := &Paste{}
+	p.init(b)
 	return p, nil
 }
 
+func (p *Paste) init(b []byte) *Paste {
+	if ( p == nil ) {
+		p = &Paste{}
+	}
+	copy(p.salt[:], randomBytes(SaltSize))
+	copy(p.nonce[:], randomBytes(NonceSize)) // IV
+	copy(p.kDFSecret[:], randomBytes(KDFSecretSize))
+	p.expire = defaultExpiry
+	p.displayFormat = defaultFormat
+	p.clearTextData = b
+	return p
+}
+
+func (p *Paste) SetPassword(pass string) {
+	p.userPassword = pass
+}
+
+func (p *Paste) BurnAfterRead(burn bool) {
+	p.burnAfterReading = burn
+}
+
+func (p *Paste) OpenDiscussion(openDiscussion bool) {
+	p.openDiscussion = openDiscussion
+}
+
 func (p *Paste) Send() (*url.URL, map[string]interface{}, error) {
+	err := p.encrypt()
+	if err != nil {
+		return nil, nil, err
+	}
+	reqb := map[string]interface{}{}
+	reqb["v"] = PrivateBinAPIVersion
+	reqb["adata"] = p.makeAData()
+	reqb["meta"] = map[string]interface{}{}
+	reqb["meta"].(map[string]interface{})["expire"] = p.expire
+	reqb["ct"] = base64.RawStdEncoding.EncodeToString(p.cipherJSONData)
+	requestBodyJSONData, err := json.Marshal(&reqb)
+	if err != nil {
+		return nil, nil, err
+	}
 	host := findFastest()
-	req, err := http.NewRequest(http.MethodPost, host.URL.String(), bytes.NewBuffer(p.RequestBodyJSONData))
+	req, err := http.NewRequest(http.MethodPost, host.URL.String(), bytes.NewBuffer(requestBodyJSONData))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -118,7 +134,7 @@ func (p *Paste) Send() (*url.URL, map[string]interface{}, error) {
 	if resm["status"].(float64) != 0 {
 		return nil, nil, errors.New("error from server: " + resm["message"].(string))
 	}
-	purl, err := url.Parse(host.URL.String() + "?" + resm["id"].(string) + "#" + base58.Encode(p.KDFSecret[:]))
+	purl, err := url.Parse(host.URL.String() + "?" + resm["id"].(string) + "#" + base58.Encode(p.kDFSecret[:]))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -135,17 +151,21 @@ func randomBytes(n int) []byte {
 }
 
 func (p *Paste) encrypt() error {
-	err := (error)(nil)
-	p.ClearJSONData, err = json.Marshal(
+	clearJSONData, err := json.Marshal(
 		&map[string]interface{}{
-			"paste": string(p.ClearTextData),
+			"paste": string(p.clearTextData),
 		},
 	)
 	if err != nil {
 		return err
 	}
-	copy(p.AESKey[:], makeAESKey(p.KDFSecret[:], p.Salt[:]))
-	c, err := aes.NewCipher(p.AESKey[:])
+	if p.userPassword != "" {
+		copy(p.aESKey[:], makeAESKey(append(p.kDFSecret[:], []byte(p.userPassword)...), p.salt[:]))
+	} else {
+		copy(p.aESKey[:], makeAESKey(p.kDFSecret[:], p.salt[:]))
+	}
+	
+	c, err := aes.NewCipher(p.aESKey[:])
 	if err != nil {
 		return err
 	}
@@ -162,7 +182,7 @@ func (p *Paste) encrypt() error {
 	if err != nil {
 		return err
 	}
-	_, err = w.Write(p.ClearJSONData)
+	_, err = w.Write(clearJSONData)
 	if err != nil {
 		return err
 	}
@@ -170,31 +190,31 @@ func (p *Paste) encrypt() error {
 	if err != nil {
 		return err
 	}
-	p.CipherJSONData = gcm.Seal(nil, p.Nonce[:], b.Bytes(), adata)
+	p.cipherJSONData = gcm.Seal(nil, p.nonce[:], b.Bytes(), adata)
 	return nil
 }
 
 func (p *Paste) makeAData() []interface{} {
 	openDiscussion := int(0)
 	burnAfterRead := int(0)
-	if p.OpenDiscussion {
+	if p.openDiscussion {
 		openDiscussion = 1
 	}
-	if p.BurnAfterReading {
+	if p.burnAfterReading {
 		burnAfterRead = 1
 	}
 	return []interface{}{
 		[]interface{}{
-			base64.RawStdEncoding.EncodeToString(p.Nonce[:]), // IV
-			base64.RawStdEncoding.EncodeToString(p.Salt[:]),  // salt
-			Iterations,
+			base64.RawStdEncoding.EncodeToString(p.nonce[:]), // IV
+			base64.RawStdEncoding.EncodeToString(p.salt[:]),  // salt
+			KDFIterations,
 			256,
 			TagSize,
 			EncryptionAlgorithm,
 			EncryptionMode,
 			DataCompression,
 		},
-		Format,
+		p.displayFormat,
 		openDiscussion,
 		burnAfterRead,
 	}
@@ -204,7 +224,7 @@ func makeAESKey(secret []byte, salt []byte) []byte {
 	return pbkdf2.Key(
 		secret,
 		salt,
-		Iterations,
+		KDFIterations,
 		AESKeySize,
 		sha256.New,
 	)
@@ -239,7 +259,7 @@ func GetPaste(ur *url.URL) ([]byte, error) {
 	if v, ok := m["ct"]; !ok {
 		return nil, errors.New("missing ct")
 	} else {
-		p.CipherJSONData, err = base64.RawStdEncoding.DecodeString(v.(string))
+		p.cipherJSONData, err = base64.RawStdEncoding.DecodeString(v.(string))
 		if err != nil {
 			return nil, err
 		}
@@ -251,18 +271,18 @@ func GetPaste(ur *url.URL) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		copy(p.Nonce[:], nonceData)
+		copy(p.nonce[:], nonceData)
 		saltData, err := base64.RawStdEncoding.DecodeString(((v.([]interface{})[0]).([]interface{})[1]).(string)) // wtf
 		if err != nil {
 			return nil, err
 		}
-		copy(p.Salt[:], saltData)
+		copy(p.salt[:], saltData)
 	}
 	secret, err := base58.Decode(b58Pass)
 	if err != nil {
 		return nil, err
 	}
-	aesKey := makeAESKey(secret, p.Salt[:])
+	aesKey := makeAESKey(secret, p.salt[:])
 	c, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return nil, err
@@ -275,7 +295,7 @@ func GetPaste(ur *url.URL) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	flated, err := gcm.Open(nil, p.Nonce[:], p.CipherJSONData, adata)
+	flated, err := gcm.Open(nil, p.nonce[:], p.cipherJSONData, adata)
 	if err != nil {
 		return nil, err
 	}

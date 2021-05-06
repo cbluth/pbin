@@ -17,8 +17,10 @@ import (
 var (
 	getURL        *url.URL
 	outFile       string
+	password	  string
 	base64Mode    bool
 	burnAfterRead bool
+	openDiscussion bool
 )
 
 func init() {
@@ -29,24 +31,41 @@ func init() {
 			{
 				base64Mode = true
 			}
-		case "-burn":
+		case "-burn", "-burnAfter":
 			{
+				if openDiscussion {
+					panic("opening a discussion and burning after reading are mutually exclusive, cant have both")
+				}
 				burnAfterRead = true
 			}
-		case "-o":
+		case "-open", "-openDiscussion", "-discussion", "-discuss":
+			{
+				if burnAfterRead {
+					panic("opening a discussion and burning after reading are mutually exclusive, cant have both")
+				}
+				openDiscussion = true
+			}
+		case "-o", "-output":
 			{
 				if !(len(args) > i+1) {
 					panic("missing output arg")
 				}
 				outFile = args[i+1]
 			}
+		case "-pass", "-password":
+			{
+				if !(len(args) > i+1) {
+					panic("missing password arg")
+				}
+				password = args[i+1]
+			}
 		}
 		if strings.HasPrefix(arg, "https://") {
-			u, err := url.Parse(arg)
+			err := (error)(nil)
+			getURL, err = url.Parse(arg)
 			if err != nil {
 				panic(err)
 			}
-			getURL = u
 		}
 	}
 }
@@ -87,10 +106,15 @@ func put() error {
 	if base64Mode {
 		b = []byte(base64.StdEncoding.EncodeToString(b))
 	}
-	pbin.BurnAfterReading = burnAfterRead
+	
 	p, err := pbin.CraftPaste(b)
 	if err != nil {
 		return err
+	}
+	p.BurnAfterRead(burnAfterRead)
+	p.OpenDiscussion(burnAfterRead)
+	if password != "" {
+		p.SetPassword(password)
 	}
 	ur, _, err := p.Send()
 	if err != nil {
