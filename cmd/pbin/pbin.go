@@ -15,15 +15,18 @@ import (
 )
 
 var (
-	getURL        *url.URL
-	outFile       string
-	password	  string
-	base64Mode    bool
-	burnAfterRead bool
+	getURL         *url.URL
+	outFile        string
+	password       string
+	replyTo        string
+	setExpiry	   string
+	base64Mode     bool
+	burnAfterRead  bool
 	openDiscussion bool
 )
 
 func init() {
+	panicstr := "opening a discussion and burning after reading are mutually exclusive, cant have both"
 	args := os.Args[1:]
 	for i, arg := range args {
 		switch arg {
@@ -31,30 +34,54 @@ func init() {
 			{
 				base64Mode = true
 			}
-		case "-burn", "-burnAfter":
+		case "-burn", "-burnafter", "-burnafterread":
 			{
 				if openDiscussion {
-					panic("opening a discussion and burning after reading are mutually exclusive, cant have both")
+					panic(panicstr)
 				}
 				burnAfterRead = true
 			}
-		case "-open", "-openDiscussion", "-discussion", "-discuss":
+		case "-open", "-opendiscussion", "-discussion", "-comments":
 			{
 				if burnAfterRead {
-					panic("opening a discussion and burning after reading are mutually exclusive, cant have both")
+					panic(panicstr)
 				}
 				openDiscussion = true
 			}
-		case "-o", "-output":
+		case "-comment", "-c", "-reply", "-re", "-r", "-addComment", "-discuss":
+			{
+				if burnAfterRead {
+					panic(panicstr)
+				}
+				openDiscussion = true
+				if len(args) > i+1 {
+					replyTo = args[i+1]
+				} else {
+					replyTo = "parent"
+				}
+			}
+		case "-expire", "-x", "-expiry":
+			{
+				if !(len(args) > i+1) {
+					panic("missing expiry arg")
+				}
+				setExpiry = strings.ReplaceAll(args[i+1], "-", "")
+			}
+		case "-hour", "-day", "-week", "-month", "-year", "-never":
+			{
+				setExpiry = strings.ReplaceAll(arg, "-", "")
+			}
+		case "-o", "-out", "-output":
 			{
 				if !(len(args) > i+1) {
 					panic("missing output arg")
 				}
 				outFile = args[i+1]
 			}
-		case "-pass", "-password":
+		case "-p", "-pass", "-password":
 			{
 				if !(len(args) > i+1) {
+					// TODO: generate random password?
 					panic("missing password arg")
 				}
 				password = args[i+1]
@@ -106,13 +133,16 @@ func put() error {
 	if base64Mode {
 		b = []byte(base64.StdEncoding.EncodeToString(b))
 	}
-	
+
 	p, err := pbin.CraftPaste(b)
 	if err != nil {
 		return err
 	}
 	p.BurnAfterRead(burnAfterRead)
 	p.OpenDiscussion(openDiscussion)
+	if setExpiry != "" {
+		p.SetExpiry(setExpiry)
+	}
 	if password != "" {
 		p.SetPassword(password)
 	}

@@ -31,6 +31,12 @@ $ pbin $URL
 
 ## Advanced Usage
 
+You can set additional options if some of these arguments, only when creating a paste:
+- -burn
+- -open
+- -base64
+- -password
+
 Upload Base64 Paste:
 ```
 $ cat cat-meme.gif | pbin -base64
@@ -65,3 +71,30 @@ Upload Paste with password protection:
 ```
 $ echo "anything" | pbin -password mySecretPassw0rd
 ```
+
+## Expiry Options
+
+You can set the expiry with one of these arguments, only when creating a paste:
+- -hour
+- -day
+- -week
+- -month
+- -year
+- -never
+
+examples:
+```
+$ echo "anything" | pbin -hour # <- will expire after 1 hour
+$ echo "anything" | pbin -week # <- will expire after 1 week
+$ echo "anything" | pbin -month # <- will expire after 1 month
+$ cat cat-meme.gif | pbin -base64 -never
+```
+
+
+# TODO:
+
+A list of things to do:
+- add reply/comment
+- add upload file
+- add shorten url
+
